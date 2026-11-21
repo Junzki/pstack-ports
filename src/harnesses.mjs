@@ -99,6 +99,7 @@ export const HARNESSES = [
     aliases: ["agy"],
     localSkillsDir: ".agents/skills",
     globalSkillsDir: (home) => join(home, ".gemini", "config", "skills"),
+    preferCopy: true,
     detect: (cwd, home) =>
       existsSync(join(home, ".gemini", "antigravity")) ||
       existsSync(join(home, ".gemini", "config")) ||

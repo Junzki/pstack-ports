@@ -135,7 +135,12 @@ function copySkillDir(srcDir, dstDir) {
   mkdirSync(dstDir, { recursive: true });
   cpSync(srcDir, dstDir, {
     recursive: true,
-    filter: (src) => !src.endsWith(".DS_Store") && !src.includes("node_modules"),
+    filter: (src) => {
+      const rel = relative(srcDir, src);
+      if (!rel) return true;
+      const parts = rel.split(/[\\/]/);
+      return !parts.includes(".DS_Store") && !parts.includes("node_modules");
+    },
   });
 }
 
@@ -248,20 +253,26 @@ export function installPstack({
     });
 
     // Step 2: symlink/junction every other unique target directory to canonical store
+    // (harnesses with `preferCopy: true`, such as Antigravity, get real copies unless --symlink was explicitly forced)
     for (const [dir, bucket] of skillBuckets) {
       if (dir === canonicalSkillsDir) continue;
-      let actualMode = "symlink";
+      const forceCopyForBucket = mode !== "symlink" && bucket.harnesses.some((h) => h.preferCopy);
+      let actualMode = forceCopyForBucket ? "copy" : "symlink";
       if (!dryRun) {
         mkdirSync(dir, { recursive: true });
         for (const skill of selectedSkills) {
-          const used = linkOrCopySkillDir(join(canonicalSkillsDir, skill.name), join(dir, skill.name));
-          if (used === "copy") actualMode = "copy";
+          if (forceCopyForBucket) {
+            copySkillDir(join(canonicalSkillsDir, skill.name), join(dir, skill.name));
+          } else {
+            const used = linkOrCopySkillDir(join(canonicalSkillsDir, skill.name), join(dir, skill.name));
+            if (used === "copy") actualMode = "copy";
+          }
         }
         writeManifest(dir, {
           package: "pstack",
           version,
           mode: actualMode,
-          canonicalDir: canonicalSkillsDir,
+          ...(actualMode === "symlink" ? { canonicalDir: canonicalSkillsDir } : {}),
           skills: selectedSkills.map((s) => s.name),
           updatedAt: new Date().toISOString(),
         });

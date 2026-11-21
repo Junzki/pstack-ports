@@ -83,7 +83,12 @@ function copyDirClean(src, dst) {
   mkdirSync(dst, { recursive: true });
   cpSync(src, dst, {
     recursive: true,
-    filter: (p) => !p.endsWith(".DS_Store") && !p.includes("node_modules"),
+    filter: (p) => {
+      const rel = relative(src, p);
+      if (!rel) return true;
+      const parts = rel.split(/[\\/]/);
+      return !parts.includes(".DS_Store") && !parts.includes("node_modules");
+    },
   });
 }
 

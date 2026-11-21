@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -202,6 +202,47 @@ describe("pstack installer & uninstaller", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
       rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("copies all skill files when run from inside a node_modules directory (npx cache) and uses real directories for Antigravity", () => {
+    const cacheBase = makeTempDir("pstack-npx-");
+    const pkgInNodeModules = join(cacheBase, "node_modules", "pstack-ports");
+    const home = makeTempDir("pstack-agy-home-");
+    const cwd = makeTempDir("pstack-agy-cwd-");
+    try {
+      mkdirSync(pkgInNodeModules, { recursive: true });
+      cpSync(join(PACKAGE_ROOT, "package.json"), join(pkgInNodeModules, "package.json"));
+      cpSync(join(PACKAGE_ROOT, "skills", "poteto-mode"), join(pkgInNodeModules, "skills", "poteto-mode"), {
+        recursive: true,
+      });
+      cpSync(join(PACKAGE_ROOT, "skills", "setup-pstack"), join(pkgInNodeModules, "skills", "setup-pstack"), {
+        recursive: true,
+      });
+      cpSync(join(PACKAGE_ROOT, "agents"), join(pkgInNodeModules, "agents"), { recursive: true });
+
+      const res = installPstack({
+        packageRoot: pkgInNodeModules,
+        harnesses: ["antigravity", "claude-code"],
+        global: true,
+        mode: "auto",
+        cwd,
+        home,
+        env: {},
+      });
+
+      assert.equal(res.skills.length, 2);
+      const agyPotetoDir = join(home, ".gemini", "config", "skills", "poteto-mode");
+      const agySetupSkill = join(home, ".gemini", "config", "skills", "setup-pstack", "SKILL.md");
+      const claudeSetupSkill = join(home, ".claude", "skills", "setup-pstack", "SKILL.md");
+
+      assert.equal(existsSync(agySetupSkill), true, "SKILL.md must be copied even when package lives under node_modules");
+      assert.equal(existsSync(claudeSetupSkill), true);
+      assert.equal(lstatSync(agyPotetoDir).isSymbolicLink(), false, "Antigravity skills should be real directories, not symlinks/junctions");
+    } finally {
+      rmSync(cacheBase, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+      rmSync(cwd, { recursive: true, force: true });
     }
   });
 });
