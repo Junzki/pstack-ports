@@ -1,0 +1,57 @@
+{
+  "name": "pstack-ports",
+  "version": "0.15.46",
+  "description": "Unofficial multi-harness port of pstack agent skills and workflows (poteto-mode, 22 playbooks, 34 workflow skills, 24 principles). Install via npx to all AI coding harnesses.",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "Lauren Tan"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Junzki/pstack-ports.git"
+  },
+  "homepage": "https://github.com/Junzki/pstack-ports",
+  "keywords": [
+    "pstack",
+    "poteto-mode",
+    "agent-skills",
+    "skills",
+    "cursor",
+    "claude-code",
+    "codex",
+    "opencode",
+    "gemini-cli",
+    "antigravity",
+    "copilot",
+    "windsurf",
+    "ai-agents"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bin": {
+    "pstack-ports": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "scripts/",
+    "skills/",
+    "agents/",
+    "docs/",
+    "assets/",
+    "plugin.json",
+    ".cursor-plugin/",
+    ".claude-plugin/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "verify": "node scripts/verify-export.mjs",
+    "test": "node --test test/cli.test.mjs",
+    "sync": "node scripts/sync-upstream.mjs",
+    "sync:check": "node scripts/sync-upstream.mjs --check"
+  }
+}

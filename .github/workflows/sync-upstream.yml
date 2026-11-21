@@ -1,0 +1,125 @@
+name: Sync upstream pstack
+
+on:
+  schedule:
+    # Run daily at 9:00 PM JST (12:00 UTC)
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Upstream branch or tag in cursor/plugins
+        required: false
+        default: main
+        type: string
+      mode:
+        description: How to apply updates (direct push to default branch, or open a PR)
+        required: false
+        default: direct
+        type: choice
+        options:
+          - direct
+          - pr
+      force:
+        description: Re-run sync even when upstream tree hash is unchanged
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream-pstack
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Sync from upstream cursor/plugins (pstack/)
+        id: sync
+        env:
+          UPSTREAM_REF: ${{ inputs.ref || 'main' }}
+          FORCE_SYNC: ${{ inputs.force || false }}
+        run: |
+          args=(--ref "$UPSTREAM_REF")
+          if [ "$FORCE_SYNC" = "true" ]; then
+            args+=(--force)
+          fi
+          node scripts/sync-upstream.mjs "${args[@]}"
+
+      - name: Verify export integrity and run tests
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          npm run verify
+          npm test
+
+      - name: Check for git changes
+        id: git
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "dirty=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dirty=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and publish update
+        if: steps.sync.outputs.changed == 'true' && steps.git.outputs.dirty == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SYNC_MODE: ${{ inputs.mode || vars.SYNC_MODE || 'direct' }}
+          VERSION: ${{ steps.sync.outputs.version }}
+          PREV_VERSION: ${{ steps.sync.outputs.prev_version }}
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          UPSTREAM_SHORT_SHA: ${{ steps.sync.outputs.upstream_short_sha }}
+          PREV_SHA: ${{ steps.sync.outputs.prev_sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'master' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          TITLE="chore(sync): update pstack to v${VERSION} (${UPSTREAM_SHORT_SHA})"
+          git commit -m "$TITLE"
+
+          open_pr() {
+            BRANCH="sync/upstream-pstack"
+            git push --force origin "HEAD:refs/heads/${BRANCH}"
+            COMPARE=""
+            if [ -n "$PREV_SHA" ] && [ "$PREV_SHA" != "local" ]; then
+              COMPARE="Upstream diff: https://github.com/cursor/plugins/compare/${PREV_SHA}...${UPSTREAM_SHA}"
+            else
+              COMPARE="Upstream commit: https://github.com/cursor/plugins/commit/${UPSTREAM_SHA}"
+            fi
+            BODY=$(printf '%s\n\n- Version: `%s` -> `%s`\n- %s\n- Verification: `npm run verify` and `npm test` passed.\n' \
+              'Automated sync of `pstack/` from [cursor/plugins](https://github.com/cursor/plugins/tree/main/pstack).' \
+              "${PREV_VERSION:-none}" \
+              "${VERSION}" \
+              "${COMPARE}")
+            if gh pr view "$BRANCH" >/dev/null 2>&1; then
+              gh pr edit "$BRANCH" --title "$TITLE" --body "$BODY"
+            else
+              gh pr create --base "$DEFAULT_BRANCH" --head "$BRANCH" --title "$TITLE" --body "$BODY"
+            fi
+          }
+
+          if [ "$SYNC_MODE" = "pr" ]; then
+            open_pr
+          else
+            if ! git push origin "HEAD:${DEFAULT_BRANCH}"; then
+              echo "Direct push to ${DEFAULT_BRANCH} was rejected; opening a pull request instead."
+              open_pr
+            fi
+          fi

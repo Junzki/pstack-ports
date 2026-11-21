@@ -1,0 +1,22 @@
+NOTICE
+
+This package is an unofficial, standalone multi-harness distribution of `pstack`.
+
+Upstream work:
+  pstack (skills, playbooks, agents, guide, and plugin metadata)
+  Author: Lauren Tan (poteto)
+  Source: https://github.com/cursor/plugins/tree/main/pstack
+  License: MIT License — Copyright (c) 2026 Lauren Tan (see LICENSE)
+
+Additions in this distribution:
+  - Multi-harness `npx` CLI installer (`bin/`, `src/`)
+  - Universal harness adapter (`docs/harness/universal.md`, `skills/poteto-mode/references/harness-adapter.md`)
+  - Upstream sync and verification tooling (`scripts/`, `.github/workflows/`, `test/`)
+  Licensed under the MIT License.
+
+Trademark & affiliation disclaimer:
+  This repository is not affiliated with, sponsored by, or endorsed by Cursor
+  (Anysphere, Inc.) or Lauren Tan. All product names, logos, and trademarks
+  (including Cursor, Claude, OpenAI Codex, Gemini, Antigravity, GitHub Copilot,
+  Windsurf, and others referenced in documentation) are the property of their
+  respective owners and are used solely to identify compatibility.
